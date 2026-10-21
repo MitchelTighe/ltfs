@@ -6,15 +6,26 @@ jobs:
   build:
     name: Build on Debian11
     runs-on: ubuntu-latest
+    container: debian:bullseye
 
     steps:
+      - name: Use archive.debian.org (Debian 11 is end of life)
+        run: |
+          sed -i 's|http://deb.debian.org|http://archive.debian.org|g' /etc/apt/sources.list
+          echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99archive
+      - name: Install build dependencies
+        run: |
+          apt update
+          apt install -y build-essential git pkg-config automake autoconf libtool libfuse-dev fuse uuid-dev libxml2-dev libsnmp-dev libicu-dev icu-devtools
+          printf '%s\n' '#!/bin/sh' 'case $1 in' "  '--cppflags') echo '' ;;" "  '--ldflags') echo '-licuuc -licudata' ;;" "  *) echo '/usr/lib/x86_64-linux-gnu/icu/pkgdata.inc' ;;" 'esac' > /usr/bin/icu-config
+          chmod +x /usr/bin/icu-config
       - name: Set up Git repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Build LTFS
-        id: build
-        uses: LinearTapeFileSystem/Debian11-Build@v1.1.1
-        with:
-          destination: '/tmp/ltfs'
-          submodules: recursive
+        run: |
+          ./autogen.sh
+          ./configure --prefix=/tmp/ltfs
+          make
+          make install
